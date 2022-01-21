@@ -5,8 +5,13 @@
 
 C++11 包含下列新的语言功能
 - [移动语意](#移动语意)
+- [变参模板](#变参模板)
 - [右值引用](#右值引用)
 - [转发引用](#转发引用)
+- [初始化列表](#初始化列表)
+- [静态断言](#静态断言)
+- [auto](#auto)
+- [decltype](#decltype)
 - [移动语意下的特殊成员函数](#移动语意下的特殊成员函数)
 
 C++11 包含下列新的库功能
@@ -23,6 +28,30 @@ C++11 包含下列新的库功能
 移动语意还能让不可复制的类型, 如 `std::unique_ptr` ([智能指针](#智能指针)), 在语言层面上确保只管理一个资源实例的同时, 还能在作用域内转移资源实例。
 
 参考其它部分: [右值引用](#右值引用), [转发引用](#转发引用), [移动语意的特殊成员函数](#移动语意的特殊成员函数), [`std::move`](#stdmove), [`std::forward`](#stdforward)。
+
+### 变参模板
+`...`创建或展开一个 _形参包_。模板 _形参包_ 是接受零个或多个模板实参(非类型, 类型或模板)的模板形参。至少有一个形参包的模板被称作 _变参模板_。
+```c++
+template <typename... T>
+struct arity {
+  constexpr static int value = sizeof...(T);
+};
+static_assert(arity<>::value == 0); // 0 个实参
+static_assert(arity<char, short, int>::value == 3); // 3 个实参
+```
+
+一个有趣的用法是, 从 _形参包_ 创建一个 _初始化列表_ 来迭代变参函数的实参。
+```c++
+template <typename First, typename... Args>
+auto sum(const First first, const Args... args) -> decltype(first) {
+  const auto values = {first, args...}; // 展开
+  return std::accumulate(values.begin(), values.end(), First{0});
+}
+
+sum(1, 2, 3, 4, 5); // 15
+sum(1, 2, 3);       // 6
+sum(1.5, 2.0, 3.7); // 7.2
+```
 
 ### 右值引用
 C++11引入了一种新的引用类型: _右值引用_ (rvalue reference)。用 `T&&` 表示一个非模板类型参数 `T` (non-template type parameter, 例如 `int` 类型, 或者自定义类型)的右值引用。右值引用只能绑定右值。
@@ -88,6 +117,90 @@ f(std::move(z)); // T 是 int 类型的右值, 推断为 f(int &&) => f(int&&)
 ```
 
 参照: [右值引用](#右值引用), [`std::move`](#stdmove), [`std::forward`](#stdforward)。
+
+### 初始化列表
+初始化列表是一种轻量的类似数组的元素容器, 通过花括号`{}`创建。例如, `{ 1, 2, 3 }` 创建了一个 `std::initializer_list<int>` 类型的整数序列。作为替代 `vector` 传递给函数很有用。
+```c++
+int sum(const std::initializer_list<int>& list) {
+  int total = 0;
+  for (auto& e : list) {
+    total += e;
+  }
+
+  return total;
+}
+
+auto list = {1, 2, 3};
+sum(list); // == 6
+sum({1, 2, 3}); // == 6
+sum({}); // == 0
+```
+
+### 静态断言
+静态断言是编译期断言
+```c++
+constexpr int x = 0;
+constexpr int y = 1;
+static_assert(x == y, "x != y");
+```
+
+### auto
+`auto` 类型的变量由编译器根据它们的初始化来推导。
+```c++
+auto a = 3.14; // double
+auto b = 1; // int
+auto& c = b; // int&
+auto d = { 0 }; // std::initializer_list<int>
+auto&& e = 1; // int&&
+auto&& f = b; // int&
+auto g = new auto(123); // int*
+const auto h = 1; // const int
+auto i = 1, j = 2, k = 3; // int, int, int
+auto l = 1, m = true, n = 1.61; // 错误 -- `l` 被推断为 int, 而 `m` 是 bool
+auto o; // 错误 -- `o` 需要初始化
+```
+
+能极大地增加可读性, 尤其是复杂的类型:
+```c++
+std::vector<int> v = ...;
+std::vector<int>::const_iterator cit = v.cbegin();
+// vs.
+auto cit = v.cbegin();
+```
+
+函数也能使用 `auto` 推断返回类型。在 C++11, 要么明确指定返回类型, 要么像这样使用 `decltype`:
+```c++
+template <typename X, typename Y>
+auto add(X x, Y y) -> decltype(x + y) {
+  return x + y;
+}
+add(1, 2); // == 3
+add(1, 2.0); // == 3.0
+add(1.5, 1.5); // == 3.0
+```
+上述示例中, 尾返回类型(trailing return type)就是表达式 `x + y` 的 _声明类型_(详见[`decltype`](#decltype))。例如, 如果 `x` 是整数 而 `y` 是双精度浮点数, `decltype(x + y)` 则是双精度浮点数。由此可知, 上面的函数将会根据表达式 `x + y` 生成的类型来推断类型。注意尾返回类型已经能获取它的形参, and `this` when appropriate。
+
+### decltype
+`decltype` 是返回表达式传入的 _声明类型_ 的操作符。表达式里的 const, voliate 和引用类型会保持不变。`decltype` 的例子:
+```c++
+int a = 1; // `a` 被声明为 `int` 类型
+decltype(a) b = a; // `decltype(a)` 是 `int` 类型
+const int& c = a; // `c` 被声明为 `const int&` 类型
+decltype(c) d = a; // `decltype(c)` 是 `const int&` 类型
+decltype(123) e = 123; // `decltype(123)` 是 `int` 类型
+int&& f = 1; // `f` 被声明为 `int&&` 类型
+decltype(f) g = 1; // `decltype(f) 是 `int&&` 类型
+decltype((a)) h = g; // `decltype((a))` 是 int& 类型
+```
+```c++
+template <typename X, typename Y>
+auto add(X x, Y y) -> decltype(x + y) {
+  return x + y;
+}
+add(1, 2.0); // `decltype(x + y)` => `decltype(3.0)` => `double`
+```
+
+还可以参照: [`decltype(auto) (C++14)`](CPP4.md#decltypeauto).
 
 ### 移动语意下的特殊成员函数
 当发生拷贝操作时, 拷贝构造函数和拷贝赋值操作符被调用。随着 C++11 引入了移动语意, 可以采用移动构造函数和移动赋值操作符来转移所有权。
