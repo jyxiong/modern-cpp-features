@@ -11,12 +11,16 @@ C++11 包含下列新的语言功能
 - [初始化列表](#初始化列表)
 - [静态断言](#静态断言)
 - [auto](#auto)
+- [lambda 表达式](#lambda-表达式)
 - [decltype](#decltype)
+- [类型别名](#类型别名)
+- [nullptr](#nullptr)
+- [强类型枚举](#强类型枚举)
 - [移动语意下的特殊成员函数](#移动语意下的特殊成员函数)
 
 C++11 包含下列新的库功能
-- [`std::move`](#stdmove)
-- [`std::forward`](#stdforward)
+- [std::move](#stdmove)
+- [std::forward](#stdforward)
 
 ## C++11 语言功能
 
@@ -27,7 +31,7 @@ C++11 包含下列新的库功能
 
 移动语意还能让不可复制的类型, 如 `std::unique_ptr` ([智能指针](#智能指针)), 在语言层面上确保只管理一个资源实例的同时, 还能在作用域内转移资源实例。
 
-参考其它部分: [右值引用](#右值引用), [转发引用](#转发引用), [移动语意的特殊成员函数](#移动语意的特殊成员函数), [`std::move`](#stdmove), [`std::forward`](#stdforward)。
+参考其它部分: [右值引用](#右值引用), [转发引用](#转发引用), [移动语意的特殊成员函数](#移动语意的特殊成员函数), [std::move](#stdmove), [std::forward](#stdforward)。
 
 ### 变参模板
 `...`创建或展开一个 _形参包_。模板 _形参包_ 是接受零个或多个模板实参(非类型, 类型或模板)的模板形参。至少有一个形参包的模板被称作 _变参模板_。
@@ -116,7 +120,7 @@ f(z); // T 是 int& 类型的左值, 推断为 f(int& &&) => f(int&)
 f(std::move(z)); // T 是 int 类型的右值, 推断为 f(int &&) => f(int&&)
 ```
 
-参照: [右值引用](#右值引用), [`std::move`](#stdmove), [`std::forward`](#stdforward)。
+参照: [右值引用](#右值引用), [std::move](#stdmove), [std::forward](#stdforward)。
 
 ### 初始化列表
 初始化列表是一种轻量的类似数组的元素容器, 通过花括号`{}`创建。例如, `{ 1, 2, 3 }` 创建了一个 `std::initializer_list<int>` 类型的整数序列。作为替代 `vector` 传递给函数很有用。
@@ -180,6 +184,37 @@ add(1.5, 1.5); // == 3.0
 ```
 上述示例中, 尾返回类型(trailing return type)就是表达式 `x + y` 的 _声明类型_(详见[`decltype`](#decltype))。例如, 如果 `x` 是整数 而 `y` 是双精度浮点数, `decltype(x + y)` 则是双精度浮点数。由此可知, 上面的函数将会根据表达式 `x + y` 生成的类型来推断类型。注意尾返回类型已经能获取它的形参, and `this` when appropriate。
 
+### lambda 表达式
+`lambda` 是一种能够捕捉作用域内变量的匿名函数对象。它的特点是: _捕获列表_, 可选的形参集合, 可选的尾返回类型, 以及函数体。捕获列表的示例:
+* `[]` - 没有捕获
+* `[=]` - 值捕获作用域内的局部对象(局部变量, 形参)
+* `[&]` - 引用捕获作用域内的局部对象(l局部变量, 形参)
+* `[this]` - 引用捕获 `this`
+* `[a, &b]` - 值捕获 `a`, 引用捕获 `b`
+
+```c++
+int x = 1;
+
+auto getX = [=] { return x; };
+getX(); // == 1
+
+auto addX = [=](int y) { return x + y; };
+addX(1); // == 2
+
+auto getXRef = [&]() -> int& { return x; };
+getXRef(); // int& to `x`
+```
+值捕获不能在 lambda 内表达式内修改, 因为编译器生成的方法被标记为 `const`。关键字 `mutable` 允许修改值捕获的变量。该关键字必须放在形参列表后面(即使形参列表为空也要列出来)。
+```c++
+int x = 1;
+
+auto f1 = [&x] { x = 2; }; // 正确: x 是引用, 并且改变了原始值
+
+auto f2 = [x] { x = 2; }; // 错误: lambda 的值捕获只能是 const 的
+// vs.
+auto f3 = [x]() mutable { x = 2; }; // 正确: 此时 lambda 的值捕获可以随意操作了
+```
+
 ### decltype
 `decltype` 是返回表达式传入的 _声明类型_ 的操作符。表达式里的 const, voliate 和引用类型会保持不变。`decltype` 的例子:
 ```c++
@@ -201,6 +236,36 @@ add(1, 2.0); // `decltype(x + y)` => `decltype(3.0)` => `double`
 ```
 
 还可以参照: [`decltype(auto) (C++14)`](CPP4.md#decltypeauto).
+
+### 类型别名
+使用 `using` 的类型别名在语意上与 `typedef` 相近, 可读性上更强，甚至还支持模板。
+```c++
+template <typename T>
+using Vec = std::vector<T>;
+Vec<int> v; // std::vector<int>
+
+using String = std::string;
+String s {"foo"};
+```
+
+### nullptr
+C++11 引入了新的空指针, 用来替代 C语言的宏 `NULL`。`nullptr` 本身是 `std::nullptr_t` 类型的,  可以隐式转换到其他指针类型, 而 `NULL`不能转换到除了 `bool` 以外的整型。
+```c++
+void foo(int);
+void foo(char*);
+foo(NULL); // 错误 -- 有歧义
+foo(nullptr); // 调用 foo(char*)
+```
+
+### 强类型枚举
+类型安全的枚举可以解决许多 C 风格枚举的问题: 隐式转换, 不能指定基础类型 ,作用域污染
+```c++
+// 指定基础类型为 `unsigned int`
+enum class Color : unsigned int { Red = 0xff0000, Green = 0xff00, Blue = 0xff };
+// `Alert` 里的 `Red`/`Green` 不会与 `Color` 里的冲突
+enum class Alert : bool { Red, Green };
+Color c = Color::Red;
+```
 
 ### 移动语意下的特殊成员函数
 当发生拷贝操作时, 拷贝构造函数和拷贝赋值操作符被调用。随着 C++11 引入了移动语意, 可以采用移动构造函数和移动赋值操作符来转移所有权。
