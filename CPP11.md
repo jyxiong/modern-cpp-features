@@ -16,6 +16,10 @@ C++11 包含下列新的语言功能
 - [类型别名](#类型别名)
 - [nullptr](#nullptr)
 - [强类型枚举](#强类型枚举)
+- [属性](#属性)
+- [常量表达式](#常量表达式)
+- [委托构造函数](#委托构造函数)
+- [用户定义字面量](#用户定义字面量)
 - [移动语意下的特殊成员函数](#移动语意下的特殊成员函数)
 
 C++11 包含下列新的库功能
@@ -267,6 +271,89 @@ enum class Color : unsigned int { Red = 0xff0000, Green = 0xff00, Blue = 0xff };
 // `Alert` 里的 `Red`/`Green` 不会与 `Color` 里的冲突
 enum class Alert : bool { Red, Green };
 Color c = Color::Red;
+```
+
+### 属性
+属性提供了一种通用语法, 如 `__attribute__(...)`, `__declspc`等。
+```c++
+// `noreturn` 属性表明函数 `f` 没有返回值
+[[ noreturn ]] void f() {
+  throw "error";
+}
+```
+
+### 常量表达式
+常量表达式是指编译器在编译时计算的表达式。常量表达式只能运行非复数计算。使用 `constexpr` 说明符表明变量, 函数等事常量表达式。
+```c++
+constexpr int square(int x) {
+  return x * x;
+}
+
+int square2(int x) {
+  return x * x;
+}
+
+int a = square(2);  // mov DWORD PTR [rbp-4], 4
+
+int b = square2(2); // mov edi, 2
+                    // call square2(int)
+                    // mov DWORD PTR [rbp-8], eax
+```
+
+`constexpr` 的值是编译器可以在编译时计算的:
+```c++
+const int x = 123;
+constexpr const int& y = x; // 错误 -- constexpr 变量 `y` 必须由常量表达式初始化
+```
+
+常量表达式与类:
+```c++
+struct Complex {
+  constexpr Complex(double r, double i) : re{r}, im{i} { }
+  constexpr double real() { return re; }
+  constexpr double imag() { return im; }
+
+private:
+  double re;
+  double im;
+};
+
+constexpr Complex I(0, 1);
+```
+
+### 委托构造函数
+类的构造函数可以通过初始化列表调用其他构造函数。
+```c++
+struct Foo {
+  int foo;
+  Foo(int foo) : foo{foo} {}
+  Foo() : Foo(0) {}
+};
+
+Foo foo;
+foo.foo; // == 0
+```
+
+### 用户定义字面量
+用户定义字面量允许拓展语言, 添加语法。创建一个字面量, 需要定义一个返回类型 `T` 的, 名为 `X` 的函数 `T operator "" X(...) { ... }`。注意, 函数的名称决定了字面量的名称。任何不以下划线开头的字面量名称都被保留且不予调用。根据字面量需要的类型, 用户定义字面量接收的形参需要遵守一些规则。
+
+摄氏度转为华氏度:
+```c++
+// `unsigned long long` 类型的形参需要整数字面量
+long long operator "" _celsius(unsigned long long tempCelsius) {
+  return std::llround(tempCelsius * 1.8 + 32);
+}
+24_celsius; // == 75
+```
+
+字符串转为整数:
+```c++
+// `const char*` 和 `std::size_t` 是需要的形参
+int operator "" _int(const char* str, std::size_t) {
+  return std::stoi(str);
+}
+
+"123"_int; // == 123, with type `int`
 ```
 
 ### 移动语意下的特殊成员函数
