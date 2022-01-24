@@ -20,6 +20,7 @@ C++11 包含下列新的语言功能
 - [常量表达式](#常量表达式)
 - [委托构造函数](#委托构造函数)
 - [用户定义字面量](#用户定义字面量)
+- [override 说明符](#override-说明符)
 - [移动语意下的特殊成员函数](#移动语意下的特殊成员函数)
 
 C++11 包含下列新的库功能
@@ -354,6 +355,21 @@ int operator "" _int(const char* str, std::size_t) {
 }
 
 "123"_int; // == 123, with type `int`
+```
+
+### override 说明符
+明确指出派生类的虚函数是重写的
+```c++
+struct A {
+  virtual void foo();
+  void bar();
+};
+
+struct B : A {
+  void foo() override; // correct -- B::foo overrides A::foo
+  void bar() override; // error -- A::bar is not virtual
+  void baz() override; // error -- B::baz does not override A::baz
+};
 ```
 
 ### 移动语意下的特殊成员函数
