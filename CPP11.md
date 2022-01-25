@@ -13,14 +13,18 @@ C++11 包含下列新的语言功能
 - [auto](#auto)
 - [lambda 表达式](#lambda-表达式)
 - [decltype](#decltype)
-- [类型别名](#类型别名)
+- [unsing](#unsing)
 - [nullptr](#nullptr)
 - [强类型枚举](#强类型枚举)
 - [属性](#属性)
-- [常量表达式](#常量表达式)
+- [constexpr](#constexpr)
 - [委托构造函数](#委托构造函数)
 - [用户定义字面量](#用户定义字面量)
-- [override 说明符](#override-说明符)
+- [override](#override)
+- [final](#final)
+- [default](#default)
+- [delete](#deleted)
+- [基于范围的 for 循环](#基于范围的-for-循环)
 - [移动语意下的特殊成员函数](#移动语意下的特殊成员函数)
 
 C++11 包含下列新的库功能
@@ -244,7 +248,7 @@ add(1, 2.0); // `decltype(x + y)` => `decltype(3.0)` => `double`
 
 还可以参照: [`decltype(auto) (C++14)`](CPP4.md#decltypeauto).
 
-### 类型别名
+### unsing
 使用 `using` 的类型别名在语意上与 `typedef` 相近, 可读性上更强，甚至还支持模板。
 ```c++
 template <typename T>
@@ -265,7 +269,7 @@ foo(nullptr); // 调用 foo(char*)
 ```
 
 ### 强类型枚举
-类型安全的枚举可以解决许多 C 风格枚举的问题: 隐式转换, 不能指定基础类型 ,作用域污染
+类型安全的枚举可以解决许多 C 风格枚举的问题: 隐式转换, 不能指定基础类型, 作用域污染
 ```c++
 // 指定基础类型为 `unsigned int`
 enum class Color : unsigned int { Red = 0xff0000, Green = 0xff00, Blue = 0xff };
@@ -283,7 +287,7 @@ Color c = Color::Red;
 }
 ```
 
-### 常量表达式
+### constexpr
 常量表达式是指编译器在编译时计算的表达式。常量表达式只能运行非复数计算。使用 `constexpr` 说明符表明变量, 函数等事常量表达式。
 ```c++
 constexpr int square(int x) {
@@ -357,7 +361,7 @@ int operator "" _int(const char* str, std::size_t) {
 "123"_int; // == 123, with type `int`
 ```
 
-### override 说明符
+### override
 明确指出派生类的虚函数是重写的
 ```c++
 struct A {
@@ -370,6 +374,87 @@ struct B : A {
   void bar() override; // error -- A::bar is not virtual
   void baz() override; // error -- B::baz does not override A::baz
 };
+```
+
+### final
+表明虚函数不能被派生类覆写, 或者类不能被继承。
+```c++
+struct A {
+  virtual void foo();
+};
+
+struct B : A {
+  virtual void foo() final;
+};
+
+struct C : B {
+  virtual void foo(); // 错误 -- 函数声明 'foo' 覆写了 'final' 函数
+};
+```
+
+Class cannot be inherited from.
+```c++
+struct A final {};
+struct B : A {}; // 错误 -- 基类 'A' 被标记为 'final'
+```
+
+### default
+一种更优雅, 更高效的提供默认函数实现的方式, 比如默认构造函数。
+```c++
+struct A {
+  A() = default;
+  A(int x) : x{x} {}
+  int x {1};
+};
+A a; // a.x == 1
+A a2 {123}; // a.x == 123
+```
+
+继承:
+```c++
+struct B {
+  B() : x{1} {}
+  int x;
+};
+
+struct C : B {
+  // 默认调用基类的构造函数 B::B()
+  C() = default;
+};
+
+C c; // c.x == 1
+```
+
+### delete
+一种更优雅, 更高效的提供禁用函数的方式。阻止对象复制很有用。
+```c++
+class A {
+  int x;
+
+public:
+  A(int x) : x{x} {};
+  A(const A&) = delete;
+  A& operator=(const A&) = delete;
+};
+
+A x {123};
+A y = x; // 错误 -- 调用了禁用的拷贝构造函数
+y = x; // 错误 -- 拷贝赋值函数被禁用
+```
+
+### 基于范围的 for 循环
+迭代容器元素的语法糖。
+```c++
+std::array<int, 5> a {1, 2, 3, 4, 5};
+for (int& x : a) x *= 2;
+// a == { 2, 4, 6, 8, 10 }
+```
+
+注意使用 `int` 和 `int&` 之间的区别:
+```c++
+std::array<int, 5> a {1, 2, 3, 4, 5};
+for (int x : a) x *= 2;
+// a == { 1, 2, 3, 4, 5 }
 ```
 
 ### 移动语意下的特殊成员函数
