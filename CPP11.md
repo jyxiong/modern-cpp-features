@@ -26,6 +26,7 @@ C++11 包含下列新的语言功能
 - [delete](#deleted)
 - [基于范围的 for 循环](#基于范围的-for-循环)
 - [移动语意下的特殊成员函数](#移动语意下的特殊成员函数)
+- [转换构造函数](#转换构造函数)
 
 C++11 包含下列新的库功能
 - [`std::move`](#stdmove)
@@ -480,6 +481,46 @@ A a2 = std::move(a1); // 使用 std::move 进行移动构造
 A a3 = A{}; // 默认构造
 a2 = std::move(a3); // 使用 std::move 进行移动赋值
 a1 = f(A{}); // 使用临时右值进行移动赋值
+```
+
+### 转换构造函数
+转换构造函数会将花括号里的值转换为构造函数的实参。
+```c++
+struct A {
+  A(int) {}
+  A(int, int) {}
+  A(int, int, int) {}
+};
+
+A a {0, 0}; // 调用 A::A(int, int)
+A b(0, 0); // 调用 A::A(int, int)
+A c = {0, 0}; // 调用 A::A(int, int)
+A d {0, 0, 0}; // 调用 A::A(int, int, int)
+```
+
+注意, 采用花括号语法时不允许数据精度的丢失:
+```c++
+struct A {
+  A(int) {}
+};
+
+A a(1.1); // OK
+A b {1.1}; // 错误 从 double 转化为 int 丢失精度
+```
+
+注意, 如果构造函数接收 `std::initializer_list`, 将会替换为以下调用:
+```c++
+struct A {
+  A(int) {}
+  A(int, int) {}
+  A(int, int, int) {}
+  A(std::initializer_list<int>) {}
+};
+
+A a {0, 0}; // calls A::A(std::initializer_list<int>)
+A b(0, 0); // calls A::A(int, int)
+A c = {0, 0}; // calls A::A(std::initializer_list<int>)
+A d {0, 0, 0}; // calls A::A(std::initializer_list<int>)
 ```
 
 ## C++11 库功能
