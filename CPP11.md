@@ -27,6 +27,7 @@ C++11 包含下列新的语言功能
 - [基于范围的 for 循环](#基于范围的-for-循环)
 - [移动语意下的特殊成员函数](#移动语意下的特殊成员函数)
 - [转换构造函数](#转换构造函数)
+- [explicit](#explicit)
 
 C++11 包含下列新的库功能
 - [`std::move`](#stdmove)
@@ -504,7 +505,7 @@ struct A {
   A(int) {}
 };
 
-A a(1.1); // OK
+A a(1.1); // 正确
 A b {1.1}; // 错误 从 double 转化为 int 丢失精度
 ```
 
@@ -517,10 +518,27 @@ struct A {
   A(std::initializer_list<int>) {}
 };
 
-A a {0, 0}; // calls A::A(std::initializer_list<int>)
-A b(0, 0); // calls A::A(int, int)
-A c = {0, 0}; // calls A::A(std::initializer_list<int>)
-A d {0, 0, 0}; // calls A::A(std::initializer_list<int>)
+A a {0, 0}; // 调用 A::A(std::initializer_list<int>)
+A b(0, 0); // 调用 A::A(int, int)
+A c = {0, 0}; // 调用 A::A(std::initializer_list<int>)
+A d {0, 0, 0}; // 调用 A::A(std::initializer_list<int>)
+```
+
+### explicit
+使用 `explicit` 说明符指定转换函数为显式。
+```c++
+struct A {
+  operator bool() const { return true; }
+};
+struct B {
+  explicit operator bool() const { return true; }
+};
+A a;
+if (a); // 正确, 调用 A::operator bool()
+bool ba = a; // 正确, 拷贝初始化 调用 A::operator bool()
+B b;
+if (b); // 正确, 调用 B::operator bool()
+bool bb = b; // 错误, 拷贝初始化不会调用 B::operator bool()
 ```
 
 ## C++11 库功能
