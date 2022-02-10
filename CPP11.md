@@ -28,6 +28,14 @@ C++11 包含下列新的语言功能
 - [移动语意下的特殊成员函数](#移动语意下的特殊成员函数)
 - [转换构造函数](#转换构造函数)
 - [explicit](#explicit)
+- [inline 命名空间](#inline-命名空间)
+- [非静态数据成员初始化](#非静态数据成员初始化)
+- [右尖括号](#右尖括号)
+- [引用限定的成员函数](#引用限定的成员函数)
+- [尾置返回类型 ](#尾置返回类型 )
+- [noexcept](#noexcept)
+- [char32_t 和 char16_t](#char32_t-和-char16_t)
+- [原始字符串字面量](#原始字符串字面量)
 
 C++11 包含下列新的库功能
 - [`std::move`](#stdmove)
@@ -539,6 +547,159 @@ bool ba = a; // 正确, 拷贝初始化 调用 A::operator bool()
 B b;
 if (b); // 正确, 调用 B::operator bool()
 bool bb = b; // 错误, 拷贝初始化不会调用 B::operator bool()
+```
+
+### inline 命名空间
+内联命名空间的所有成员都被当作上层命名空间的一部分, 允许函数特化和简化版本控制。内联命名空间具有传递性: 如果 A 包含 B, B 包含 C, 且 B 和 C 都是内联命名空间, 那么 C 的成员也能被 A 使用。
+
+```c++
+namespace Program {
+  namespace Version1 {
+    int getVersion() { return 1; }
+    bool isFirstVersion() { return true; }
+  }
+  inline namespace Version2 {
+    int getVersion() { return 2; }
+  }
+}
+
+int version {Program::getVersion()};              // 使用 Version2::getVersion()
+int oldVersion {Program::Version1::getVersion()}; // 使用 Version1::getVersion()
+bool firstVersion {Program::isFirstVersion()};    // 仅当添加了 Version2::isFirstVersion() 才能使用
+```
+
+### 非静态数据成员初始化
+允许非静态数据成员在声明时初始化, 使默认初始化的构造函数更加整洁。
+
+```c++
+// C++11 之前的默认初始化
+class Human {
+    Human() : age{0} {}
+  private:
+    unsigned age;
+};
+// C++11 之后的默认初始化
+class Human {
+  private:
+    unsigned age {0}; // 或者 unsigned age = 0;
+};
+```
+
+### 右尖括号
+当使用连续的右尖括号时, C++11 能够推断时是作为操作符还是作为 `typedef` 的闭合表达式, 而不需要添加空格。
+```c++
+
+typedef std::map<int, std::map <int, std::map <int, int> > > cpp98LongTypedef;
+typedef std::map<int, std::map <int, std::map <int, int>>>   cpp11LongTypedef;
+```
+
+### 引用限定的成员函数
+可以根据 `*this` 是左值引用还是右值引用来制定成员函数。
+
+```c++
+struct Bar {
+  // ...
+};
+
+struct Foo {
+  Bar getBar() & { return bar; }
+  Bar getBar() const& { return bar; }
+  Bar getBar() && { return std::move(bar); }
+private:
+  Bar bar;
+};
+
+Foo foo{};
+Bar bar = foo.getBar(); // 调用 `Bar getBar() &`
+
+const Foo foo2{};
+Bar bar2 = foo2.getBar(); // 调用 `Bar Foo::getBar() const&`
+
+Foo{}.getBar(); // 调用 `Bar Foo::getBar() &&`
+std::move(foo).getBar(); // 调用 `Bar Foo::getBar() &&`
+
+std::move(foo2).getBar(); // 调用 `Bar Foo::getBar() const&&`
+```
+
+### 尾置返回类型
+C++11 提供了一种语法, 允许函数和 lambda 表达式指定返回类型。
+```c++
+int f() {
+  return 123;
+}
+// vs.
+auto f() -> int {
+  return 123;
+}
+```
+```c++
+auto g = []() -> int {
+  return 123;
+};
+```
+这个功能非常有用, 尤其是不能确定返回值类型时:
+```c++
+// 注意: 编译不通过
+template <typename T, typename U>
+decltype(a + b) add(T a, U b) {
+    return a + b;
+}
+
+// 尾置返回类型允许:
+template <typename T, typename U>
+auto add(T a, U b) -> decltype(a + b) {
+    return a + b;
+}
+```
+在 C++14 可以使用 [`decltype(auto) (C++14)`](README.md#decltypeauto)。
+
+### noexcept
+`noexcept` 说明符指定函数是否能够抛出异常, 是 `throw()` 的改进版。
+
+```c++
+void func1() noexcept;        // 不抛异常
+void func2() noexcept(true);  // 不抛异常
+void func3() throw();         // 不抛异常
+
+void func4() noexcept(false); // 有可能抛异常
+```
+
+不抛异常的函数可以调用有可能抛异常的函数。每当异常抛出, 会搜索解决方法直到不抛异常函数的最外层, 将会调用 `std::terminate` 函数。
+
+```c++
+extern void f();  // potentially-throwing
+void g() noexcept {
+    f();          // valid, even if f throws
+    throw 42;     // valid, effectively a call to std::terminate
+}
+```
+
+### char32_t 和 char16_t
+提供标准类型表示 UTF-8 字符串。
+```c++
+char32_t utf8_str[] = U"\u0123";
+char16_t utf8_str[] = u"\u0123";
+```
+
+### 原始字符串字面量
+C++11 提供了新的方式来声明字符串字面量。可以原始输入转义序列的字符(如: 制表符, 换行符, 单个反斜杠等), 同时保留格式。这对于编写可能包含大量引号或特殊格式的字面量文本非常有用。这可以使字符串字面量更易于阅读和维护。
+
+原始字符串字面量使用以下语法声明:
+```
+R"delimiter(raw_characters)delimiter"
+```
+其中:
+* `delimiter` 是由任何原始字符组成的序列, 除了括号, 反斜杠和空格。
+* `raw_characters` 原始字符串序列; 禁止包含结尾序列 `")delimiter"`。
+
+例如:
+```cpp
+// msg1 与 msg2 是等价的。
+const char* msg1 = "\nHello,\n\tworld!\n";
+const char* msg2 = R"(
+Hello,
+	world!
+)";
 ```
 
 ## C++11 库功能
