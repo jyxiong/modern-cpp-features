@@ -40,6 +40,7 @@ C++11 包含下列新的语言功能
 C++11 包含下列新的库功能
 - [`std::move`](#stdmove)
 - [`std::forward`](#stdforward)
+- [std::thread](#stdthread)
 - [智能指针](#智能指针)
 - [`std::make_shared`](#stdmake_shared)
 
@@ -751,6 +752,20 @@ wrapper(A{}); // 传入临时右值, 经过转发, 调用移动构造函数
 A a;
 wrapper(a); // 传入左值, 经过转发, 调用拷贝构造函数
 wrapper(std::move(a)); // 传入移动生成的右值, 经过转发, 调用移动构造函数
+```
+### `std::thread`
+`std::thread` 提供线程管理的标准方式, 包括建立和销毁。在下面的例子中, 使用多线程进行不同的计算, 程序等待所有线程计算完成才结束。
+
+```c++
+void foo(bool clause) { /* do something... */ }
+std::vector<std::thread> threadsVector;
+threadsVector.emplace_back([]() {
+  // 待调用的 lambda 函数
+});
+threadsVector.emplace_back(foo, true);  // 线程将会运行 foo(true)
+for (auto& thread : threadsVector) {
+  thread.join(); //等待所有线程结束
+}
 ```
 
 ### 智能指针
